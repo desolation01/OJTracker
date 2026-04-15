@@ -39,7 +39,7 @@ export function Header({ name, hasActiveSession = false }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-3">
-        {isPwaLocalMode ? <Badge variant="outline">Local Mode</Badge> : null}
+        {isPwaLocalMode ? <Badge variant="default">Local Mode</Badge> : null}
         {hasActiveSession ? <Badge variant="success">Session Active</Badge> : <Badge variant="muted">No Session</Badge>}
         {!isPwaLocalMode ? (
           <Button
