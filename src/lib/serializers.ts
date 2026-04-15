@@ -1,4 +1,4 @@
-import type { Entry, Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import type { EntrySource } from "@prisma/client";
 
 import { utcDateToDateKey } from "@/lib/date";

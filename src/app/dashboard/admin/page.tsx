@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import useSWR from "swr";
 import { Shield, Users } from "lucide-react";
 
@@ -32,6 +32,11 @@ const fetcher = async (url: string) => {
 };
 
 export default function AdminPage() {
+  const [sortKey, setSortKey] = useState<keyof OJTUser>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const adminUsersKey = isPwaLocalMode ? null : "/api/admin/users";
+  const { data, isLoading, error } = useSWR<{ users: OJTUser[] }>(adminUsersKey, fetcher);
+
   if (isPwaLocalMode) {
     return (
       <Card>
@@ -44,10 +49,6 @@ export default function AdminPage() {
       </Card>
     );
   }
-
-  const { data, isLoading, error } = useSWR<{ users: OJTUser[] }>("/api/admin/users", fetcher);
-  const [sortKey, setSortKey] = useState<keyof OJTUser>("name");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const sorted = data?.users
     ? [...data.users].sort((a, b) => {
