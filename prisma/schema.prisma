@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  passwordHash  String?
+  image         String?
+  role          UserRole       @default(USER)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  settings      UserSettings?
+  entries       Entry[]
+  clockSessions ClockSession[]
+}
+
+model UserSettings {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetHours        Int      @default(600)
+  defaultHoursPerDay Float    @default(8)
+  defaultStartTime   String   @default("08:00")
+  defaultEndTime     String   @default("17:00")
+  daysOff            Int[]    @default([0, 6])
+  holidays           String[] @default([])
+  timezone           String   @default("Asia/Manila")
+  ojtStartDate       DateTime? @db.Date
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Entry {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime    @db.Date
+  hours     Int         @default(0)
+  minutes   Int         @default(0)
+  timeIn    String?
+  timeOut   String?
+  note      String?
+  source    EntrySource @default(MANUAL)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model ClockSession {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clockIn   DateTime
+  clockOut  DateTime?
+  date      DateTime  @db.Date
+  entryId   String?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, clockOut])
+}
+
+enum EntrySource {
+  MANUAL
+  BULK
+  TIMECLOCK
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
