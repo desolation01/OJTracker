@@ -10,10 +10,13 @@ import { BulkEntryForm } from "@/components/entries/BulkEntryForm";
 import { EntryTable } from "@/components/entries/EntryTable";
 import { useEntries } from "@/hooks/useEntries";
 import { useSettings } from "@/hooks/useSettings";
-import { monthKeyFromDate } from "@/lib/date";
+
+function getStableMonthKey() {
+  return new Date().toISOString().slice(0, 7);
+}
 
 export default function EntriesPage() {
-  const [monthKey, setMonthKey] = useState(monthKeyFromDate(new Date()));
+  const [monthKey, setMonthKey] = useState(getStableMonthKey);
   const { entries, bulkCreate } = useEntries(monthKey);
   const { settings } = useSettings();
 

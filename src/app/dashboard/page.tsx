@@ -15,7 +15,7 @@ import { EntryForm } from "@/components/entries/EntryForm";
 import { useCalendar } from "@/hooks/useCalendar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useSettings } from "@/hooks/useSettings";
-import { dateKeyToUTCDate, localDateToDateKey } from "@/lib/date";
+import { dateKeyToUTCDate, utcDateToDateKey } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
@@ -26,7 +26,7 @@ export default function DashboardPage() {
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [isBulkSaving, setIsBulkSaving] = useState(false);
 
-  const activeDate = selectedDate ?? localDateToDateKey(new Date());
+  const activeDate = selectedDate ?? utcDateToDateKey(new Date());
   const activeEntry = useMemo(() => entries.find((entry) => entry.date === activeDate), [activeDate, entries]);
   const selectedRangeDays = useMemo(() => {
     if (selectedDates.length === 0) {

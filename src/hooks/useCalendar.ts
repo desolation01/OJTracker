@@ -5,8 +5,13 @@ import { useMemo, useState } from "react";
 
 import { monthKeyFromDate } from "@/lib/date";
 
+function getStableTodayDate() {
+  const utcDateKey = new Date().toISOString().slice(0, 10);
+  return new Date(`${utcDateKey}T00:00:00.000Z`);
+}
+
 export function useCalendar() {
-  const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
+  const [currentMonthDate, setCurrentMonthDate] = useState(getStableTodayDate);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const monthKey = useMemo(() => monthKeyFromDate(currentMonthDate), [currentMonthDate]);
