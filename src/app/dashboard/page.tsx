@@ -91,7 +91,7 @@ export default function DashboardPage() {
       setIsBulkSaving(true);
       const result = await bulkCreate({ dates: selectedDates });
       toast.success(
-        `Created ${result.created} entries (${result.skipped.existing} existing, ${result.skipped.daysOff} day offs).`,
+        `Created ${result.created} entries (${result.skipped.existing} existing, ${result.skipped.daysOff} day offs, ${result.skipped.holidays} holidays).`,
       );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to bulk add entries.");

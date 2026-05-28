@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { bulkEntrySchema, dateKeySchema } from "@/lib/validators";
 import { dateKeyToUTCDate, utcDateToDateKey } from "@/lib/date";
 import { decimalHoursToMinutes, minutesToHoursMinutes } from "@/lib/utils";
+import { isPhHolidayDateKey } from "@/lib/ph-holidays";
 import { getOrCreateUserSettings, requireSessionUser } from "@/lib/server";
 
 const bulkSelectionSchema = z.union([
@@ -56,10 +57,12 @@ export async function POST(req: NextRequest) {
     ]);
 
     const existingByDate = new Set(existingEntries.map((entry) => utcDateToDateKey(entry.date)));
+    const userHolidays = new Set(settings.holidays ?? []);
     const defaultMinutes = decimalHoursToMinutes(settings.defaultHoursPerDay);
     const { hours, minutes } = minutesToHoursMinutes(defaultMinutes);
 
     let skippedDaysOff = 0;
+    let skippedHolidays = 0;
     let skippedExisting = 0;
     let created = 0;
 
@@ -71,6 +74,11 @@ export async function POST(req: NextRequest) {
         }
 
         const key = utcDateToDateKey(date);
+        if (userHolidays.has(key) || isPhHolidayDateKey(key)) {
+          skippedHolidays += 1;
+          return false;
+        }
+
         if (existingByDate.has(key)) {
           skippedExisting += 1;
           return false;
@@ -101,6 +109,7 @@ export async function POST(req: NextRequest) {
       skipped: {
         existing: skippedExisting,
         daysOff: skippedDaysOff,
+        holidays: skippedHolidays,
       },
     });
   } catch (error) {

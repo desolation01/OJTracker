@@ -8,6 +8,7 @@ import {
   utcDateToDateKey,
 } from "@/lib/date";
 import { decimalHoursToMinutes, minutesToHoursMinutes } from "@/lib/utils";
+import { isPhHolidayDateKey } from "@/lib/ph-holidays";
 
 const STORAGE_KEYS = {
   entries: "ojtracker:pwa:entries",
@@ -232,12 +233,19 @@ export function bulkCreateLocalEntries(payload: { startDate: string; endDate: st
 
   let skippedExisting = 0;
   let skippedDaysOff = 0;
+  let skippedHolidays = 0;
   let created = 0;
+  const userHolidays = new Set(settings.holidays ?? []);
 
   for (const dateKey of dateKeys) {
     const date = dateKeyToUTCDate(dateKey);
     if (settings.daysOff.includes(date.getUTCDay())) {
       skippedDaysOff += 1;
+      continue;
+    }
+
+    if (userHolidays.has(dateKey) || isPhHolidayDateKey(dateKey)) {
+      skippedHolidays += 1;
       continue;
     }
 
@@ -268,6 +276,7 @@ export function bulkCreateLocalEntries(payload: { startDate: string; endDate: st
     skipped: {
       existing: skippedExisting,
       daysOff: skippedDaysOff,
+      holidays: skippedHolidays,
     },
   };
 }

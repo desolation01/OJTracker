@@ -7,11 +7,16 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { utcDateToDateKey } from "@/lib/date";
+import { isPhHolidayDateKey } from "@/lib/ph-holidays";
 import type { UserSettingsDTO } from "@/types";
 
 interface BulkEntryFormProps {
   settings?: UserSettingsDTO;
-  onSubmit: (startDate: string, endDate: string) => Promise<{ created: number; skipped: { existing: number; daysOff: number } }>;
+  onSubmit: (startDate: string, endDate: string) => Promise<{
+    created: number;
+    skipped: { existing: number; daysOff: number; holidays: number };
+  }>;
 }
 
 export function BulkEntryForm({ settings, onSubmit }: BulkEntryFormProps) {
@@ -31,8 +36,20 @@ export function BulkEntryForm({ settings, onSubmit }: BulkEntryFormProps) {
       return null;
     }
 
+    const userHolidays = new Set(settings?.holidays ?? []);
     const allDates = eachDayOfInterval({ start, end });
-    const workingDays = allDates.filter((date) => !settings?.daysOff?.includes(date.getUTCDay())).length;
+    const workingDays = allDates.filter((date) => {
+      if (settings?.daysOff?.includes(date.getUTCDay())) {
+        return false;
+      }
+
+      const dateKey = utcDateToDateKey(date);
+      if (userHolidays.has(dateKey) || isPhHolidayDateKey(dateKey)) {
+        return false;
+      }
+
+      return true;
+    }).length;
     const projectedHours = workingDays * (settings?.defaultHoursPerDay ?? 8);
     return { workingDays, projectedHours };
   }, [startDate, endDate, settings]);
@@ -44,7 +61,7 @@ export function BulkEntryForm({ settings, onSubmit }: BulkEntryFormProps) {
       setIsSubmitting(true);
       const response = await onSubmit(startDate, endDate);
       setResult(
-        `Created ${response.created} entries. Skipped ${response.skipped.daysOff} day-offs and ${response.skipped.existing} existing entries.`,
+        `Created ${response.created} entries. Skipped ${response.skipped.daysOff} day-offs, ${response.skipped.holidays} holidays, and ${response.skipped.existing} existing entries.`,
       );
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Bulk entry failed.");

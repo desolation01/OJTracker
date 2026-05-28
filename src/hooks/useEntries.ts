@@ -161,7 +161,7 @@ export function useEntries(monthKey: string) {
 
     const result = await response.json();
     void Promise.all([mutate(entriesKey), mutate("/api/stats")]);
-    return result as { created: number; skipped: { existing: number; daysOff: number } };
+    return result as { created: number; skipped: { existing: number; daysOff: number; holidays: number } };
   }
 
   return {
@@ -173,4 +173,3 @@ export function useEntries(monthKey: string) {
     bulkCreate,
   };
 }
-

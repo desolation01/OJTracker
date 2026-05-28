@@ -230,7 +230,7 @@ export function useDashboardData(monthKey: string) {
 
     const result = await response.json();
     void Promise.all([mutate(summaryKey), mutate(entriesKey)]);
-    return result as { created: number; skipped: { existing: number; daysOff: number } };
+    return result as { created: number; skipped: { existing: number; daysOff: number; holidays: number } };
   }
 
   async function bulkDelete(payload: { startDate: string; endDate: string } | { dates: string[] }) {
