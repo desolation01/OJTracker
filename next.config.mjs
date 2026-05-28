@@ -5,6 +5,15 @@ const nextConfig = {
       bodySizeLimit: "2mb",
     },
   },
+  async redirects() {
+    return [
+      {
+        source: "/favicon.ico",
+        destination: "/icon",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

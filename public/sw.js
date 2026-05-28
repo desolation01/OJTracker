@@ -1,9 +1,27 @@
-const CACHE_NAME = "ojtracker-pwa-v1";
-const APP_SHELL = ["/", "/dashboard", "/manifest.webmanifest", "/icon?size=192", "/icon?size=512", "/apple-icon"];
+const CACHE_NAME = "ojtracker-pwa-v2";
+const APP_SHELL = ["/manifest.webmanifest", "/icon?size=192", "/icon?size=512", "/apple-icon", "/favicon.ico"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()),
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+
+      await Promise.allSettled(
+        APP_SHELL.map(async (url) => {
+          try {
+            const response = await fetch(url, { cache: "no-cache" });
+            if (!response.ok) {
+              return;
+            }
+            await cache.put(url, response.clone());
+          } catch {
+            // Ignore individual precache failures so SW install can continue.
+          }
+        }),
+      );
+
+      await self.skipWaiting();
+    })(),
   );
 });
 
@@ -34,8 +52,10 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        const copy = response.clone();
-        void caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        if (response.ok) {
+          const copy = response.clone();
+          void caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
         return response;
       })
       .catch(async () => {
@@ -43,8 +63,7 @@ self.addEventListener("fetch", (event) => {
         if (cached) {
           return cached;
         }
-        return caches.match("/dashboard");
+        return caches.match("/");
       }),
   );
 });
-
