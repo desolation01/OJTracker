@@ -16,8 +16,9 @@ coverage/
 # Env files (keep templates committed)
 .env
 .env.*
-!.env.example
+.env.example
 *.local
+
 
 # Logs
 *.log
