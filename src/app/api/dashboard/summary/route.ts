@@ -4,7 +4,8 @@ import { addMonths } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { toEntryDTO, ENTRY_SELECT } from "@/lib/serializers";
 import { monthKeySchema } from "@/lib/validators";
-import { dateKeyToUTCDate, addWorkingDays, monthKeyFromDate } from "@/lib/date";
+import { dateKeyToUTCDate, monthKeyFromDate, utcDateToDateKey } from "@/lib/date";
+import { estimateCompletion } from "@/lib/calculations";
 import { getOrCreateUserSettings, requireSessionUser } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
 
     // Month-filtered entries for calendar display
     // All-time aggregate for stats (progress, remaining, estimated end date)
-    const [entries, settings, totals] = await Promise.all([
+    const [entries, settings, totals, allEntryDates] = await Promise.all([
       prisma.entry.findMany({
         where: {
           userId: user.id,
@@ -55,6 +56,14 @@ export async function GET(req: NextRequest) {
           id: true,
         },
       }),
+      prisma.entry.findMany({
+        where: { userId: user.id },
+        select: {
+          date: true,
+          hours: true,
+          minutes: true,
+        },
+      }),
     ]);
 
     const totalMinutes = (totals._sum.hours ?? 0) * 60 + (totals._sum.minutes ?? 0);
@@ -62,9 +71,14 @@ export async function GET(req: NextRequest) {
     const queryCompletedAt = Date.now();
     const targetMinutes = settings.targetHours * 60;
     const remainingMinutes = Math.max(0, targetMinutes - totalMinutes);
-    const dailyMinutes = Math.round(settings.defaultHoursPerDay * 60);
-    const estimatedDaysLeft = dailyMinutes > 0 ? Math.ceil(remainingMinutes / dailyMinutes) : 0;
-    const completionDate = addWorkingDays(new Date(), estimatedDaysLeft, settings.daysOff, new Set(settings.holidays));
+    const { estimatedDaysLeft, estimatedCompletionDate } = estimateCompletion(
+      allEntryDates.map((entry) => ({
+        date: utcDateToDateKey(entry.date),
+        hours: entry.hours,
+        minutes: entry.minutes,
+      })),
+      settings,
+    );
 
     if (process.env.NODE_ENV === "development") {
       console.log(
@@ -82,12 +96,13 @@ export async function GET(req: NextRequest) {
         remainingHours: remainingMinutes / 60,
         percentComplete: targetMinutes > 0 ? Math.min(100, (totalMinutes / targetMinutes) * 100) : 0,
         estimatedDaysLeft,
-        estimatedCompletionDate: completionDate ? completionDate.toISOString().slice(0, 10) : null,
+        estimatedCompletionDate,
         entryCount,
         currentStreak: 0,
         defaultHoursPerDay: settings.defaultHoursPerDay,
         daysOff: settings.daysOff,
         holidays: settings.holidays,
+        timezone: settings.timezone,
       },
     });
   } catch (error) {

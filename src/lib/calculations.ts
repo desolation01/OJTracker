@@ -1,4 +1,5 @@
-import { addWorkingDays } from "@/lib/date";
+import { dateKeyToUTCDate, getDateKeyInTimeZone, utcDateToDateKey } from "@/lib/date";
+import { isPhHolidayDateKey } from "@/lib/ph-holidays";
 import type { EntryDTO, UserSettingsDTO } from "@/types";
 
 export interface StatsResult {
@@ -15,6 +16,7 @@ export interface StatsResult {
   defaultHoursPerDay: number;
   daysOff: number[];
   holidays: string[];
+  timezone: string;
 }
 
 function computeCurrentStreak(entries: EntryDTO[]) {
@@ -49,9 +51,7 @@ export function calculateStats(entries: EntryDTO[], settings: UserSettingsDTO): 
   const totalMinutes = entries.reduce((sum, entry) => sum + entry.hours * 60 + entry.minutes, 0);
   const targetMinutes = settings.targetHours * 60;
   const remainingMinutes = Math.max(0, targetMinutes - totalMinutes);
-  const dailyMinutes = Math.round(settings.defaultHoursPerDay * 60);
-  const estimatedDaysLeft = dailyMinutes > 0 ? Math.ceil(remainingMinutes / dailyMinutes) : 0;
-  const completionDate = addWorkingDays(new Date(), estimatedDaysLeft, settings.daysOff, new Set(settings.holidays));
+  const { estimatedDaysLeft, estimatedCompletionDate } = estimateCompletion(entries, settings);
 
   return {
     totalMinutes,
@@ -61,11 +61,67 @@ export function calculateStats(entries: EntryDTO[], settings: UserSettingsDTO): 
     remainingHours: remainingMinutes / 60,
     percentComplete: targetMinutes > 0 ? Math.min(100, (totalMinutes / targetMinutes) * 100) : 0,
     estimatedDaysLeft,
-    estimatedCompletionDate: completionDate ? completionDate.toISOString().slice(0, 10) : null,
+    estimatedCompletionDate,
     entryCount: entries.length,
     currentStreak: computeCurrentStreak(entries),
     defaultHoursPerDay: settings.defaultHoursPerDay,
     daysOff: settings.daysOff,
     holidays: settings.holidays,
+    timezone: settings.timezone,
   };
+}
+
+export function estimateCompletion(
+  entries: Pick<EntryDTO, "date" | "hours" | "minutes">[],
+  settings: Pick<UserSettingsDTO, "targetHours" | "defaultHoursPerDay" | "daysOff" | "holidays" | "timezone">,
+  today = new Date(),
+) {
+  const todayKey = getDateKeyInTimeZone(today, settings.timezone);
+  const targetMinutes = settings.targetHours * 60;
+  const defaultDailyMinutes = Math.round(settings.defaultHoursPerDay * 60);
+
+  if (targetMinutes <= 0 || defaultDailyMinutes <= 0) {
+    return { estimatedDaysLeft: 0, estimatedCompletionDate: null };
+  }
+
+  const futureMinutesByDate = new Map<string, number>();
+  let projectedTotalMinutes = 0;
+
+  for (const entry of entries) {
+    const entryMinutes = entry.hours * 60 + entry.minutes;
+    if (entry.date <= todayKey) {
+      projectedTotalMinutes += entryMinutes;
+      continue;
+    }
+
+    futureMinutesByDate.set(entry.date, (futureMinutesByDate.get(entry.date) ?? 0) + entryMinutes);
+  }
+
+  if (projectedTotalMinutes >= targetMinutes) {
+    return { estimatedDaysLeft: 0, estimatedCompletionDate: null };
+  }
+
+  const holidays = new Set(settings.holidays);
+  const cursor = dateKeyToUTCDate(todayKey);
+  let estimatedDaysLeft = 0;
+
+  for (let guard = 0; guard < 3650 && projectedTotalMinutes < targetMinutes; guard += 1) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    const dateKey = utcDateToDateKey(cursor);
+    const isSkippedDay =
+      settings.daysOff.includes(cursor.getUTCDay()) || holidays.has(dateKey) || isPhHolidayDateKey(dateKey);
+
+    if (isSkippedDay) {
+      continue;
+    }
+
+    projectedTotalMinutes += futureMinutesByDate.get(dateKey) ?? defaultDailyMinutes;
+    estimatedDaysLeft += 1;
+
+    if (projectedTotalMinutes >= targetMinutes) {
+      return { estimatedDaysLeft, estimatedCompletionDate: dateKey };
+    }
+  }
+
+  return { estimatedDaysLeft: 0, estimatedCompletionDate: null };
 }

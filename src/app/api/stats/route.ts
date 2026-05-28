@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { addWorkingDays, utcDateToDateKey } from "@/lib/date";
+import { utcDateToDateKey } from "@/lib/date";
+import { estimateCompletion } from "@/lib/calculations";
 import { getOrCreateUserSettings, requireSessionUser } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export async function GET() {
     }
     const authCompletedAt = Date.now();
 
-    const [settings, totals, workedDates] = await Promise.all([
+    const [settings, totals, entries] = await Promise.all([
       getOrCreateUserSettings(user.id),
       prisma.entry.aggregate({
         where: { userId: user.id },
@@ -49,12 +50,11 @@ export async function GET() {
         },
       }),
       prisma.entry.findMany({
-        where: {
-          userId: user.id,
-          OR: [{ hours: { gt: 0 } }, { minutes: { gt: 0 } }],
-        },
+        where: { userId: user.id },
         select: {
           date: true,
+          hours: true,
+          minutes: true,
         },
       }),
     ]);
@@ -63,10 +63,15 @@ export async function GET() {
     const totalMinutes = (totals._sum.hours ?? 0) * 60 + (totals._sum.minutes ?? 0);
     const targetMinutes = settings.targetHours * 60;
     const remainingMinutes = Math.max(0, targetMinutes - totalMinutes);
-    const dailyMinutes = Math.round(settings.defaultHoursPerDay * 60);
-    const estimatedDaysLeft = dailyMinutes > 0 ? Math.ceil(remainingMinutes / dailyMinutes) : 0;
-    const completionDate = addWorkingDays(new Date(), estimatedDaysLeft, settings.daysOff, new Set(settings.holidays));
-    const workedDateKeys = new Set(workedDates.map(({ date }) => utcDateToDateKey(date)));
+    const entryDates = entries.map((entry) => ({
+      date: utcDateToDateKey(entry.date),
+      hours: entry.hours,
+      minutes: entry.minutes,
+    }));
+    const { estimatedDaysLeft, estimatedCompletionDate } = estimateCompletion(entryDates, settings);
+    const workedDateKeys = new Set(
+      entryDates.filter((entry) => entry.hours * 60 + entry.minutes > 0).map((entry) => entry.date),
+    );
 
     if (process.env.NODE_ENV === "development") {
       console.log(
@@ -82,12 +87,13 @@ export async function GET() {
       remainingHours: remainingMinutes / 60,
       percentComplete: targetMinutes > 0 ? Math.min(100, (totalMinutes / targetMinutes) * 100) : 0,
       estimatedDaysLeft,
-      estimatedCompletionDate: completionDate ? completionDate.toISOString().slice(0, 10) : null,
+      estimatedCompletionDate,
       entryCount: totals._count.id,
       currentStreak: computeCurrentStreakFromWorkedDates(workedDateKeys),
       defaultHoursPerDay: settings.defaultHoursPerDay,
       daysOff: settings.daysOff,
       holidays: settings.holidays,
+      timezone: settings.timezone,
     });
   } catch (error) {
     console.error("Stats GET error:", error);

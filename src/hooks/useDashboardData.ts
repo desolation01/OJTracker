@@ -1,10 +1,9 @@
 "use client";
 
 import useSWR, { useSWRConfig } from "swr";
-import { addWorkingDays } from "@/lib/date";
 
 import type { EntryDTO } from "@/types";
-import type { StatsResult } from "@/lib/calculations";
+import { estimateCompletion, type StatsResult } from "@/lib/calculations";
 import { isPwaLocalMode } from "@/lib/pwa-mode";
 import {
   LOCAL_SWR_KEYS,
@@ -30,13 +29,16 @@ interface DashboardSummaryResponse {
   stats: StatsResult;
 }
 
-function applyStatsDelta(stats: StatsResult, deltaMinutes: number, deltaCount: number): StatsResult {
+function applyStatsDelta(
+  stats: StatsResult,
+  entries: EntryDTO[],
+  deltaMinutes: number,
+  deltaCount: number,
+): StatsResult {
   const totalMinutes = stats.totalMinutes + deltaMinutes;
   const targetMinutes = stats.targetHours * 60;
   const remainingMinutes = Math.max(0, targetMinutes - totalMinutes);
-  const dailyMinutes = Math.round(stats.defaultHoursPerDay * 60);
-  const estimatedDaysLeft = dailyMinutes > 0 ? Math.ceil(remainingMinutes / dailyMinutes) : 0;
-  const completionDate = addWorkingDays(new Date(), estimatedDaysLeft, stats.daysOff, new Set(stats.holidays));
+  const { estimatedDaysLeft, estimatedCompletionDate } = estimateCompletion(entries, stats);
   return {
     ...stats,
     totalMinutes,
@@ -46,7 +48,7 @@ function applyStatsDelta(stats: StatsResult, deltaMinutes: number, deltaCount: n
     percentComplete: targetMinutes > 0 ? Math.min(100, (totalMinutes / targetMinutes) * 100) : 0,
     entryCount: stats.entryCount + deltaCount,
     estimatedDaysLeft,
-    estimatedCompletionDate: completionDate ? completionDate.toISOString().slice(0, 10) : null,
+    estimatedCompletionDate,
   };
 }
 
@@ -115,7 +117,7 @@ export function useDashboardData(monthKey: string) {
         const stats = current?.stats;
         return {
           entries: updatedEntries,
-          stats: stats ? applyStatsDelta(stats, deltaMinutes, deltaCount) : stats!,
+          stats: stats ? applyStatsDelta(stats, updatedEntries, deltaMinutes, deltaCount) : stats!,
         };
       },
       {
@@ -149,7 +151,7 @@ export function useDashboardData(monthKey: string) {
           const stats = current?.stats;
           return {
             entries: updatedEntries,
-            stats: stats ? applyStatsDelta(stats, deltaMinutes, deltaCount) : stats!,
+            stats: stats ? applyStatsDelta(stats, updatedEntries, deltaMinutes, deltaCount) : stats!,
           };
         },
         revalidate: false,
@@ -184,7 +186,7 @@ export function useDashboardData(monthKey: string) {
         const deltaMinutes = -(entry.hours * 60 + entry.minutes);
         return {
           entries: updatedEntries,
-          stats: applyStatsDelta(stats, deltaMinutes, -1),
+          stats: applyStatsDelta(stats, updatedEntries, deltaMinutes, -1),
         };
       },
       {
@@ -199,7 +201,7 @@ export function useDashboardData(monthKey: string) {
           const deltaMinutes = -(entry.hours * 60 + entry.minutes);
           return {
             entries: updatedEntries,
-            stats: applyStatsDelta(stats, deltaMinutes, -1),
+            stats: applyStatsDelta(stats, updatedEntries, deltaMinutes, -1),
           };
         },
         revalidate: false,
@@ -265,4 +267,3 @@ export function useDashboardData(monthKey: string) {
     bulkDelete,
   };
 }
-

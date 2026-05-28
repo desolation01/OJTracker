@@ -1,17 +1,23 @@
 # Dependencies
 node_modules/
 
-# Next.js / build artifacts
+# Build artifacts
 .next/
 out/
 dist/
 coverage/
 *.tsbuildinfo
 
-# Env files (keep template files committed)
+# Caches / local tooling state
+.turbo/
+.cache/
+.vercel/
+
+# Env files (keep templates committed)
 .env
 .env.*
 !.env.example
+*.local
 
 # Logs
 *.log
@@ -20,12 +26,12 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Local dev/runtime output
-.next-dev.out.log
-.next-dev.err.log
-
-# OS/editor files
-.DS_Store
-Thumbs.db
+# Local agent / IDE metadata
+.claude/
+.superpowers/
 .vscode/
 .idea/
+
+# OS files
+.DS_Store
+Thumbs.db

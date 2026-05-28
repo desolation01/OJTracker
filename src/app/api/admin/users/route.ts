@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { addWorkingDays, utcDateToDateKey } from "@/lib/date";
+import { utcDateToDateKey } from "@/lib/date";
+import { estimateCompletion } from "@/lib/calculations";
 import { isPhHoliday } from "@/lib/ph-holidays";
 import { requireAdminUser } from "@/lib/server";
 
@@ -85,12 +86,20 @@ export async function GET() {
         cursor.setUTCDate(cursor.getUTCDate() + 1);
       }
 
-      // Estimated days left
-      const dailyMinutes = Math.round(defaultHoursPerDay * 60);
-      const estimatedDaysLeft = dailyMinutes > 0 ? Math.ceil(remainingMinutes / dailyMinutes) : 0;
-
-      // Estimated completion date
-      const completionDate = addWorkingDays(new Date(), estimatedDaysLeft, daysOff, new Set(settings?.holidays ?? []));
+      const { estimatedDaysLeft, estimatedCompletionDate } = estimateCompletion(
+        u.entries.map((entry) => ({
+          date: utcDateToDateKey(entry.date),
+          hours: entry.hours,
+          minutes: entry.minutes,
+        })),
+        {
+          targetHours,
+          defaultHoursPerDay,
+          daysOff,
+          holidays: settings?.holidays ?? [],
+          timezone: settings?.timezone ?? "Asia/Manila",
+        },
+      );
 
       return {
         id: u.id,
@@ -103,7 +112,7 @@ export async function GET() {
         remainingHours: Math.round(remainingHours * 100) / 100,
         percentComplete: Math.round(percentComplete * 10) / 10,
         estimatedDaysLeft,
-        estimatedCompletionDate: completionDate ? completionDate.toISOString().slice(0, 10) : null,
+        estimatedCompletionDate,
       };
     });
 

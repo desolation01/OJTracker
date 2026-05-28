@@ -50,9 +50,18 @@ export function getPhHoliday(date: Date): string | null {
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
 
-  const fullKey = `${yyyy}-${mm}-${dd}`;
-  if (MOVABLE_HOLIDAYS[fullKey]) {
-    return MOVABLE_HOLIDAYS[fullKey];
+  return getPhHolidayByDateKey(`${yyyy}-${mm}-${dd}`);
+}
+
+export function isPhHoliday(date: Date): boolean {
+  return getPhHoliday(date) !== null;
+}
+
+export function getPhHolidayByDateKey(dateKey: string): string | null {
+  const [, mm, dd] = dateKey.split("-");
+
+  if (MOVABLE_HOLIDAYS[dateKey]) {
+    return MOVABLE_HOLIDAYS[dateKey];
   }
 
   const fixedKey = `${mm}-${dd}`;
@@ -63,6 +72,6 @@ export function getPhHoliday(date: Date): string | null {
   return null;
 }
 
-export function isPhHoliday(date: Date): boolean {
-  return getPhHoliday(date) !== null;
+export function isPhHolidayDateKey(dateKey: string): boolean {
+  return getPhHolidayByDateKey(dateKey) !== null;
 }
